@@ -1,0 +1,21 @@
+# Dependencias de Node.js
+node_modules/
+
+# Archivos de registro
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Directorios de salida de la compilación
+dist/
+build/
+
+# Configuración del entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos de configuración de editores
+.vscode/
+.idea/
+
