@@ -4,45 +4,56 @@ const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
 const minify = require('html-minifier-terser').minify;
+const CleanCSS = require('clean-css');
 
 async function minifyAndInlineHTML(inputHtmlPath) {
     // Leer el archivo HTML
     let html = fs.readFileSync(inputHtmlPath, 'utf8');
 
-    // Regex para encontrar los archivos CSS y JS en el HTML
-    const cssRegex = /<link\s+rel="stylesheet"\s+href="([^"]+)"/g;
-    const jsRegex = /<script\s+src="([^"]+)"/g;
+    // Expresión regular mejorada para capturar correctamente las etiquetas <link>
+    const cssRegex = /<link\s+rel=["']stylesheet["']\s+href=["']([^"']+)["']\s*\/?>/g;
+    const jsRegex = /<script\s+src=["']([^"']+)["']\s*><\/script>/g;
 
     // Minificar e incrustar cada archivo CSS
     html = html.replace(cssRegex, (match, href) => {
         const cssPath = path.resolve(path.dirname(inputHtmlPath), href);
-        const cssMinified = esbuild.buildSync({
-            entryPoints: [cssPath],
-            bundle: true,
-            minify: true,
-            write: false,
-        }).outputFiles[0].text;
-        return `<style>${cssMinified}</style>`;
+        if (path.extname(cssPath) === '.css') {
+            try {
+                const cssContent = fs.readFileSync(cssPath, 'utf8');
+                const cssMinified = new CleanCSS({}).minify(cssContent).styles;
+                return `<style>${cssMinified}</style>`;
+            } catch (error) {
+                console.error(`Error al procesar el archivo CSS: ${cssPath}`, error);
+            }
+        }
+        return match; // No modificar si no es CSS
     });
 
     // Minificar e incrustar cada archivo JS
     html = html.replace(jsRegex, (match, src) => {
         const jsPath = path.resolve(path.dirname(inputHtmlPath), src);
-        const jsMinified = esbuild.buildSync({
-            entryPoints: [jsPath],
-            bundle: true,
-            minify: true,
-            write: false,
-        }).outputFiles[0].text;
-        return `<script>${jsMinified}</script>`;
+        if (path.extname(jsPath) === '.js') {
+            try {
+                const jsMinified = esbuild.buildSync({
+                    entryPoints: [jsPath],
+                    bundle: true,
+                    minify: true,
+                    write: false
+                }).outputFiles[0].text;
+                return `<script>${jsMinified}</script>`;
+            } catch (error) {
+                console.error(`Error al procesar el archivo JS: ${jsPath}`, error);
+            }
+        }
+        return match; // No modificar si no es JS
     });
 
     // Minificar el HTML resultante de manera asíncrona
     const minifiedHtml = await minify(html, {
         collapseWhitespace: true,
         removeComments: true,
-        minifyCSS: true,
-        minifyJS: true,
+        minifyCSS: false, // Ya hemos minificado el CSS manualmente
+        minifyJS: false,  // Ya hemos minificado el JS manualmente
     });
 
     // Generar la nueva ruta con la extensión .bundle.html
